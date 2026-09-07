@@ -2,9 +2,10 @@ console.log("[YouTube Lo-Fi Sync] Content script loaded.");
 
 let currentVideo = null;
 
-const LOFI_VOLUME = 0.30;      // 30% volume
-const FADE_DURATION = 2000;    // 2 seconds
-const FADE_INTERVAL = 50;      // Update every 50ms
+let savedVolume = 1;
+
+const FADE_DURATION = 2000;    
+const FADE_INTERVAL = 50;      
 
 let fadeTimer = null;
 
@@ -168,7 +169,7 @@ function playWithFade() {
                 "[YouTube Lo-Fi Sync] Lo-fi started. Fading in..."
             );
 
-            fadeTo(LOFI_VOLUME);
+            fadeTo(savedVolume);
 
         })
         .catch((error) => {
@@ -191,6 +192,8 @@ function pauseWithFade() {
 
     stopFade();
 
+    savedVolume = currentVideo.volume;
+
     console.log(
         "[YouTube Lo-Fi Sync] Fading out..."
     );
@@ -199,6 +202,7 @@ function pauseWithFade() {
 
         if (currentVideo) {
             currentVideo.pause();
+            currentVideo.volume = savedVolume;
         }
 
         console.log(
