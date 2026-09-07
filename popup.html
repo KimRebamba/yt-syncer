@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kim's Syncer</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+
+    <main class="terminal">
+
+        <header>
+            <div class="brand">
+                <img
+                    src="icons/icon32.png"
+                    alt=""
+                    class="title-icon"
+                >
+
+                <div class="title">KIM'S SYNCER</div>
+            </div>
+
+            <div class="version">v1.2.0</div>
+        </header>
+
+        <div class="line"></div>
+
+        <section class="section">
+
+            <label for="lectureSelect">
+                <span>&gt;</span> lecture
+            </label>
+
+            <select id="lectureSelect">
+                <option value="">-- select tab --</option>
+            </select>
+
+        </section>
+
+        <section class="section">
+
+            <label for="lofiSelect">
+                <span>&gt;</span> lo-fi
+            </label>
+
+            <select id="lofiSelect">
+                <option value="">-- select tab --</option>
+            </select>
+
+        </section>
+
+        <div class="line"></div>
+
+        <section class="controls">
+
+            <button id="pairButton">
+                [ PAIR ]
+            </button>
+
+            <button id="syncButton">
+                [ SYNC ]
+            </button>
+
+            <button id="unpairButton">
+                [ UNPAIR ]
+            </button>
+
+        </section>
+
+        <div class="line"></div>
+
+        <section class="status-section">
+
+            <div class="status-label">
+                STATUS
+            </div>
+
+            <div id="status" class="status">
+                &gt; waiting...
+            </div>
+
+        </section>
+
+        <footer>
+
+            <span class="made-by">
+                made by kim :)
+            </span>
+
+            <button id="howToUse" class="how-to-use">
+                how to use
+            </button>
+
+        </footer>
+
+    </main>
+
+    <script src="popup.js"></script>
+
+</body>
+</html>
