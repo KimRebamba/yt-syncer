@@ -9,9 +9,8 @@ Laziness. Kidding. I made this because after I watch a lecture video, I usually 
 # Screenshots
 
 <p float="left">
-  <img src="screenshots/1.png" width="33.33%" />
-  <img src="screenshots/2.png" width="33.33%" /> 
-  <img src="screenshots/3.png" width="33.33%" /> 
+  <img src="screenshots/1.png" width="50.00%" />
+  <img src="screenshots/2.png" width="50.00%" /> 
 </p>
 
 # Installation
