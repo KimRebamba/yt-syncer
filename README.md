@@ -19,10 +19,10 @@ Laziness. Kidding. I made this because after I watch a lecture video, I usually 
 3. Enable Developer mode.
 4. Click Load unpacked.
 5. Select this project's folder.
-6. Open two YouTube tabs:
-- One for your lecture
-- One for your lo-fi
+6. Open your YouTube lecture tabs and one YouTube Music tab.
 7. Refresh or Ctrl + F5 both YouTube tabs if you have just reloaded or updated the extension.
 8. Open Kim's Syncer.
-9. Select the lecture and lo-fi tabs.
+9. Select all lecture tabs and the Music tab. Use Ctrl-click or Shift-click to select multiple lectures.
 10. Click [ PAIR ].
+
+When any paired lecture starts, the other paired lectures and Music pause. Music plays again only when all paired lectures are paused or ended.

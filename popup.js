@@ -1,8 +1,8 @@
 const lectureSelect =
     document.getElementById("lectureSelect");
 
-const lofiSelect =
-    document.getElementById("lofiSelect");
+const musicSelect =
+    document.getElementById("musicSelect");
 
 const pairButton =
     document.getElementById("pairButton");
@@ -28,7 +28,7 @@ function setStatus(message, type = "") {
 }
 
 
-function shortenTitle(title, maxLength = 55) {
+function shortenTitle(title, maxLength = 35) {
 
     if (!title) {
         return "Untitled YouTube tab";
@@ -38,7 +38,7 @@ function shortenTitle(title, maxLength = 55) {
         return title;
     }
 
-    return title.substring(0, maxLength) + "...";
+    return `${(title.substring(0, maxLength)).trim()}...`;
 }
 
 
@@ -74,7 +74,8 @@ async function getYoutubeTabs() {
 
             return (
                 url.hostname === "www.youtube.com" ||
-                url.hostname === "youtube.com"
+                url.hostname === "youtube.com" ||
+                url.hostname === "music.youtube.com"
             );
 
         } catch {
@@ -92,7 +93,7 @@ async function loadTabs() {
 
     lectureSelect.innerHTML = "";
 
-    lofiSelect.innerHTML = "";
+    musicSelect.innerHTML = "";
 
 
     const lectureDefault =
@@ -101,24 +102,24 @@ async function loadTabs() {
     lectureDefault.value = "";
 
     lectureDefault.textContent =
-        "Select lecture tab";
+        "Select lecture tab/s below:";
 
 
-    const lofiDefault =
+    const musicDefault =
         document.createElement("option");
 
-    lofiDefault.value = "";
+    musicDefault.value = "";
 
-    lofiDefault.textContent =
-        "Select lo-fi tab";
+    musicDefault.textContent =
+        "Select Music tab";
 
 
     lectureSelect.appendChild(
         lectureDefault
     );
 
-    lofiSelect.appendChild(
-        lofiDefault
+    musicSelect.appendChild(
+        musicDefault
     );
 
 
@@ -128,7 +129,7 @@ async function loadTabs() {
             createOption(tab)
         );
 
-        lofiSelect.appendChild(
+        musicSelect.appendChild(
             createOption(tab)
         );
     }
@@ -148,15 +149,21 @@ async function loadExistingPair() {
 
     if (
         pair?.enabled &&
-        pair.lectureTabId &&
-        pair.lofiTabId
+        pair.lectureTabIds?.length > 0 &&
+        pair.musicTabId
     ) {
 
-        lectureSelect.value =
-            String(pair.lectureTabId);
+        for (const lectureTabId of pair.lectureTabIds || []) {
+            const option =
+                lectureSelect.querySelector(`option[value="${lectureTabId}"]`);
 
-        lofiSelect.value =
-            String(pair.lofiTabId);
+            if (option) {
+                option.selected = true;
+            }
+        }
+
+        musicSelect.value =
+            String(pair.musicTabId);
 
 
         setStatus(
@@ -177,14 +184,16 @@ pairButton.addEventListener(
     "click",
     async () => {
 
-        const lectureTabId =
-            Number(lectureSelect.value);
+        const lectureTabIds =
+            Array.from(lectureSelect.selectedOptions)
+                .map((option) => Number(option.value))
+                .filter(Boolean);
 
-        const lofiTabId =
-            Number(lofiSelect.value);
+        const musicTabId =
+            Number(musicSelect.value);
 
 
-        if (!lectureTabId) {
+        if (lectureTabIds.length === 0) {
 
             setStatus(
                 "Choose a lecture tab.",
@@ -195,10 +204,10 @@ pairButton.addEventListener(
         }
 
 
-        if (!lofiTabId) {
+        if (!musicTabId) {
 
             setStatus(
-                "Choose a lo-fi tab.",
+                "Choose a Music tab.",
                 "error"
             );
 
@@ -206,10 +215,10 @@ pairButton.addEventListener(
         }
 
 
-        if (lectureTabId === lofiTabId) {
+        if (lectureTabIds.includes(musicTabId)) {
 
             setStatus(
-                "Lecture and lo-fi cannot be the same tab.",
+                "Lecture and Music cannot be the same tab.",
                 "error"
             );
 
@@ -222,8 +231,8 @@ pairButton.addEventListener(
             const result =
                 await chrome.runtime.sendMessage({
                     type: "SET_PAIR",
-                    lectureTabId,
-                    lofiTabId
+                    lectureTabIds,
+                    musicTabId
                 });
 
 
@@ -240,7 +249,7 @@ pairButton.addEventListener(
 
 
             setStatus(
-                "Paired! Lecture now controls your lo-fi.",
+                "Paired! Lecture now controls your Music.",
                 "success"
             );
 
@@ -327,11 +336,11 @@ howToUseButton.addEventListener("click", () => {
 `INSTRUCTIONS:
 
 1. Open your YouTube lecture.
-2. Open your YouTube lo-fi video in another tab.
+2. Open your YouTube Music video in another tab.
 3. CTRL + F5 both tabs.
 4. Open Kim's Syncer.
-5. Select the lecture tab under "lecture".
-6. Select the lo-fi tab under "lo-fi".
+5. Select all lecture tabs under "lectures" (Ctrl-click or Shift-click).
+6. Select the Music tab under "Music".
 7. Click [ PAIR ].`
     );
 });

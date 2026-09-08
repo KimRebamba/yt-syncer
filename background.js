@@ -1,12 +1,18 @@
-const STORAGE_KEY = "youtubeLofiPair";
+const STORAGE_KEY = "youtubemusicPair";
 
 async function getPair() {
   const result = await chrome.storage.local.get(STORAGE_KEY);
-  return result[STORAGE_KEY] || {
-    lectureTabId: null,
-    lofiTabId: null,
+  const pair = result[STORAGE_KEY] || {
+    lectureTabIds: [],
+    musicTabId: null,
     enabled: false
   };
+
+  if (!Array.isArray(pair.lectureTabIds)) {
+    pair.lectureTabIds = pair.lectureTabId ? [pair.lectureTabId] : [];
+  }
+
+  return pair;
 }
 
 async function savePair(pair) {
@@ -23,13 +29,13 @@ async function injectContentScript(tabId) {
     });
 
     console.log(
-      `[YouTube Lo-Fi Sync] Content script injected into tab ${tabId}`
+      `[YouTube Music Sync] Content script injected into tab ${tabId}`
     );
 
     return true;
   } catch (error) {
     console.error(
-      `[YouTube Lo-Fi Sync] Failed to inject into tab ${tabId}:`,
+      `[YouTube Music Sync] Failed to inject into tab ${tabId}:`,
       error
     );
 
@@ -38,7 +44,7 @@ async function injectContentScript(tabId) {
 }
 
 async function sendControl(tabId, action) {
-  if (!tabId) return;
+  if (tabId == null) return;
 
   try {
     await chrome.tabs.sendMessage(tabId, {
@@ -47,7 +53,7 @@ async function sendControl(tabId, action) {
     });
   } catch (error) {
     console.log(
-      `[YouTube Lo-Fi Sync] Content script missing in tab ${tabId}. Injecting...`
+      `[YouTube Music Sync] Content script missing in tab ${tabId}. Injecting...`
     );
 
     const injected = await injectContentScript(tabId);
@@ -62,7 +68,7 @@ async function sendControl(tabId, action) {
         });
       } catch (retryError) {
         console.error(
-          "[YouTube Lo-Fi Sync] Could not send control after injection:",
+          "[YouTube Music Sync] Could not send control after injection:",
           retryError
         );
       }
@@ -72,74 +78,71 @@ async function sendControl(tabId, action) {
 
 async function syncWithLecture() {
   const pair = await getPair();
+  const lectureTabIds = pair.lectureTabIds;
 
   if (
     !pair.enabled ||
-    !pair.lectureTabId ||
-    !pair.lofiTabId
+    lectureTabIds.length === 0 ||
+    pair.musicTabId == null
   ) {
     return;
   }
 
-  try {
-    const response = await chrome.tabs.sendMessage(
-      pair.lectureTabId,
-      {
+  let lectureIsPlaying = false;
+
+  for (const lectureTabId of lectureTabIds) {
+    try {
+      const response = await chrome.tabs.sendMessage(lectureTabId, {
         type: "GET_VIDEO_STATE"
+      });
+
+      if (response?.found && !response.paused && !response.ended) {
+        lectureIsPlaying = true;
+        break;
       }
-    );
+    } catch (error) {
+      console.log(
+        `[YouTube Music Sync] Could not read lecture state in tab ${lectureTabId}. Injecting content script...`
+      );
 
-    if (!response) return;
-
-    if (response.found) {
-
-    if (response.paused || response.ended) {
-        await sendControl(pair.lofiTabId, "PLAY");
-    } else {
-        await sendControl(pair.lofiTabId, "PAUSE");
-    }
-
-}
-
-    
-  } catch (error) {
-    console.log(
-      "[YouTube Lo-Fi Sync] Could not read lecture state. Injecting content script..."
-    );
-
-    const injected = await injectContentScript(pair.lectureTabId);
-
-    if (injected) {
-      setTimeout(syncWithLecture, 300);
+      await injectContentScript(lectureTabId);
     }
   }
+
+  await sendControl(pair.musicTabId, lectureIsPlaying ? "PAUSE" : "PLAY");
 }
 
 chrome.runtime.onMessage.addListener(
   async (message, sender, sendResponse) => {
 
-    // Lecture video changed state
+     
     if (message.type === "LECTURE_STATE_CHANGED") {
 
       const pair = await getPair();
 
       if (
         !pair.enabled ||
-        sender.tab?.id !== pair.lectureTabId
+        !pair.lectureTabIds.includes(sender.tab?.id)
       ) {
         return;
       }
 
       console.log(
-        `[YouTube Lo-Fi Sync] Lecture state: ${message.state}`
+        `[YouTube Music Sync] Lecture state: ${message.state}`
       );
 
       if (message.state === "PLAYING") {
-        await sendControl(pair.lofiTabId, "PAUSE");
+        await sendControl(pair.musicTabId, "PAUSE");
+
+        await Promise.all(
+          pair.lectureTabIds
+            .filter((tabId) => tabId !== sender.tab.id)
+            .map((tabId) => sendControl(tabId, "PAUSE"))
+        );
       }
 
       if (message.state === "PAUSED") {
-        await sendControl(pair.lofiTabId, "PLAY");
+        await syncWithLecture();
       }
 
       return;
@@ -148,17 +151,19 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "SET_PAIR") {
 
       const pair = {
-        lectureTabId: message.lectureTabId,
-        lofiTabId: message.lofiTabId,
+        lectureTabIds: message.lectureTabIds,
+        musicTabId: message.musicTabId,
         enabled: true
       };
 
       await savePair(pair);
 
-      console.log("[YouTube Lo-Fi Sync] Pair created:", pair);
+      console.log("[YouTube Music Sync] Pair created:", pair);
 
-      await injectContentScript(pair.lectureTabId);
-      await injectContentScript(pair.lofiTabId);
+      await Promise.all(
+        pair.lectureTabIds.map((tabId) => injectContentScript(tabId))
+      );
+      await injectContentScript(pair.musicTabId);
 
       await syncWithLecture();
 
@@ -172,12 +177,12 @@ chrome.runtime.onMessage.addListener(
     if (message.type === "UNPAIR") {
 
       await savePair({
-        lectureTabId: null,
-        lofiTabId: null,
+        lectureTabIds: [],
+        musicTabId: null,
         enabled: false
       });
 
-      console.log("[YouTube Lo-Fi Sync] Pair removed.");
+      console.log("[YouTube Music Sync] Pair removed.");
 
       sendResponse({
         success: true
@@ -211,20 +216,33 @@ chrome.runtime.onMessage.addListener(
 chrome.tabs.onRemoved.addListener(async (tabId) => {
 
   const pair = await getPair();
+  const lectureTabIds = pair.lectureTabIds.filter(
+    (lectureTabId) => lectureTabId !== tabId
+  );
 
-  if (
-    tabId === pair.lectureTabId ||
-    tabId === pair.lofiTabId
-  ) {
+  if (tabId === pair.musicTabId) {
 
     await savePair({
-      lectureTabId: null,
-      lofiTabId: null,
+      lectureTabIds: [],
+      musicTabId: null,
       enabled: false
     });
 
     console.log(
-      "[YouTube Lo-Fi Sync] A paired tab was closed. Pair disabled."
+      "[YouTube Music Sync] A paired tab was closed. Pair disabled."
     );
+  } else if (lectureTabIds.length !== pair.lectureTabIds.length) {
+    await savePair({
+      ...pair,
+      lectureTabIds
+    });
+
+    if (lectureTabIds.length === 0) {
+      await savePair({
+        lectureTabIds: [],
+        musicTabId: pair.musicTabId,
+        enabled: false
+      });
+    }
   }
 });

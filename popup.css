@@ -94,6 +94,8 @@ label span {
 select {
     width: 100%;
 
+    min-height: 42px;
+
     padding: 9px 10px;
 
     background: #050505;
@@ -236,4 +238,24 @@ footer {
 
 .how-to-use:active {
     background: transparent;
+}
+
+select[multiple] {
+    min-height: 104px;
+}
+
+select::-webkit-scrollbar {
+    width: 6px;
+}
+
+select::-webkit-scrollbar-track {
+    background: #000;
+}
+
+select::-webkit-scrollbar-thumb {
+    background: #333;
+}
+
+select::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }

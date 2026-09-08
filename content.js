@@ -1,8 +1,18 @@
-console.log("[YouTube Lo-Fi Sync] Content script loaded.");
+console.log("[YouTube Music Sync] Content script loaded.");
 
 let currentVideo = null;
 
 let savedVolume = 1;
+
+let fadeOperation = 0;
+
+let isFading = false;
+
+const VOLUME_STORAGE_KEY = "youtubemusicVolume";
+
+let volumeLoaded = false;
+
+let volumeReady;
 
 const FADE_DURATION = 2000;    
 const FADE_INTERVAL = 50;      
@@ -23,12 +33,12 @@ function notifyState(state) {
 }
 
 function handlePlay() {
-    console.log("[YouTube Lo-Fi Sync] Video playing.");
+    console.log("[YouTube Music Sync] Video playing.");
     notifyState("PLAYING");
 }
 
 function handlePause() {
-    console.log("[YouTube Lo-Fi Sync] Video paused.");
+    console.log("[YouTube Music Sync] Video paused.");
     notifyState("PAUSED");
 }
 
@@ -41,6 +51,7 @@ function attachToVideo(video) {
     if (currentVideo) {
         currentVideo.removeEventListener("play", handlePlay);
         currentVideo.removeEventListener("pause", handlePause);
+        currentVideo.removeEventListener("volumechange", handleVolumeChange);
     }
 
     currentVideo = video;
@@ -51,9 +62,14 @@ function attachToVideo(video) {
 
     currentVideo.addEventListener("play", handlePlay);
     currentVideo.addEventListener("pause", handlePause);
+    currentVideo.addEventListener("volumechange", handleVolumeChange);
+
+    if (!volumeLoaded && !isFading && currentVideo.volume > 0) {
+        savedVolume = currentVideo.volume;
+    }
 
     console.log(
-        "[YouTube Lo-Fi Sync] Connected to YouTube player."
+        "[YouTube Music Sync] Connected to YouTube player."
     );
 }
 
@@ -88,6 +104,8 @@ function stopFade() {
         clearInterval(fadeTimer);
         fadeTimer = null;
     }
+
+    isFading = false;
 }
 
 function fadeTo(targetVolume, callback) {
@@ -98,12 +116,15 @@ function fadeTo(targetVolume, callback) {
 
     stopFade();
 
+    isFading = true;
+
     const startVolume = currentVideo.volume;
     const difference = targetVolume - startVolume;
 
     if (Math.abs(difference) < 0.01) {
 
         currentVideo.volume = targetVolume;
+        isFading = false;
 
         if (callback) {
             callback();
@@ -115,6 +136,8 @@ function fadeTo(targetVolume, callback) {
     const steps = FADE_DURATION / FADE_INTERVAL;
     const volumeStep = difference / steps;
 
+    let fadeVolume = startVolume;
+
     fadeTimer = setInterval(() => {
 
         if (!currentVideo) {
@@ -122,24 +145,26 @@ function fadeTo(targetVolume, callback) {
             return;
         }
 
-        let newVolume = currentVideo.volume + volumeStep;
+        fadeVolume += volumeStep;
 
-        // Fade up
-        if (difference > 0 && newVolume >= targetVolume) {
-            newVolume = targetVolume;
+        if (difference > 0 && fadeVolume >= targetVolume) {
+            fadeVolume = targetVolume;
         }
 
-        // Fade down
-        if (difference < 0 && newVolume <= targetVolume) {
-            newVolume = targetVolume;
+        if (difference < 0 && fadeVolume <= targetVolume) {
+            fadeVolume = targetVolume;
         }
 
-        currentVideo.volume = Math.max(
+        fadeVolume = Math.max(
             0,
-            Math.min(1, newVolume)
+            Math.min(1, fadeVolume)
         );
 
-        if (currentVideo.volume === targetVolume) {
+        currentVideo.volume = fadeVolume;
+
+        if (Math.abs(fadeVolume - targetVolume) < 0.001) {
+
+            currentVideo.volume = targetVolume;
 
             stopFade();
 
@@ -151,6 +176,56 @@ function fadeTo(targetVolume, callback) {
     }, FADE_INTERVAL);
 }
 
+function saveVolume(volume) {
+    chrome.storage.local.set({
+        [VOLUME_STORAGE_KEY]: volume
+    }).catch(() => {});
+}
+
+function handleVolumeChange() {
+
+    if (!currentVideo) {
+        return;
+    }
+
+     
+    if (isFading) {
+        return;
+    }
+
+     
+    if (currentVideo.muted) {
+        return;
+    }
+
+    if (currentVideo.volume > 0.01) {
+
+        savedVolume = currentVideo.volume;
+
+        saveVolume(savedVolume);
+
+        console.log(
+            "[YouTube Music Sync] Saved volume:",
+            savedVolume
+        );
+    }
+}
+
+async function loadSavedVolume() {
+    try {
+        const result = await chrome.storage.local.get(VOLUME_STORAGE_KEY);
+        const volume = result[VOLUME_STORAGE_KEY];
+
+        if (typeof volume === "number" && volume > 0 && volume <= 1) {
+            savedVolume = volume;
+        }
+
+        volumeLoaded = true;
+    } catch {
+        volumeLoaded = true;
+    }
+}
+
 
 function playWithFade() {
 
@@ -158,28 +233,48 @@ function playWithFade() {
         return false;
     }
 
+    const operation = ++fadeOperation;
+
     stopFade();
 
-    currentVideo.volume = 0;
+    volumeReady.then(() => {
 
-    currentVideo.play()
-        .then(() => {
+        if (!currentVideo || operation !== fadeOperation) {
+            return;
+        }
+
+         
+        const targetVolume = Math.max(
+            0.01,
+            Math.min(1, savedVolume)
+        );
+
+         
+        currentVideo.volume = 0;
+
+        return currentVideo.play().then(() => {
+
+            if (!currentVideo || operation !== fadeOperation) {
+                return;
+            }
 
             console.log(
-                "[YouTube Lo-Fi Sync] Lo-fi started. Fading in..."
+                "[YouTube Music Sync] Music started. Fading in to:",
+                targetVolume
             );
 
-            fadeTo(savedVolume);
-
-        })
-        .catch((error) => {
-
-            console.warn(
-                "[YouTube Lo-Fi Sync] Play failed:",
-                error
-            );
+            fadeTo(targetVolume);
 
         });
+
+    }).catch((error) => {
+
+        console.warn(
+            "[YouTube Music Sync] Play failed:",
+            error
+        );
+
+    });
 
     return true;
 }
@@ -190,28 +285,46 @@ function pauseWithFade() {
         return false;
     }
 
+     
+    if (!isFading && currentVideo.volume > 0.01) {
+        savedVolume = currentVideo.volume;
+        saveVolume(savedVolume);
+    }
+
+    const operation = ++fadeOperation;
+
     stopFade();
 
-    savedVolume = currentVideo.volume;
-
     console.log(
-        "[YouTube Lo-Fi Sync] Fading out..."
+        "[YouTube Music Sync] Fading out from:",
+        currentVideo.volume,
+        "to 0"
     );
 
     fadeTo(0, () => {
 
-        if (currentVideo) {
+        if (
+            currentVideo &&
+            operation === fadeOperation
+        ) {
+
             currentVideo.pause();
+
+             
+             
             currentVideo.volume = savedVolume;
+
         }
 
         console.log(
-            "[YouTube Lo-Fi Sync] Lo-fi paused."
+            "[YouTube Music Sync] Music paused."
         );
     });
 
     return true;
 }
+
+volumeReady = loadSavedVolume();
 
 
 chrome.runtime.onMessage.addListener(
