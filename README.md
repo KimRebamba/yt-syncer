@@ -1,6 +1,8 @@
 # Description
 A Chrome extension that sychronizes a YouTube video/lecture tab with a YouTube video/music tab. This way, you can play music after you pause your lecture, and pause it again when you study again. 
 
+!! Supports YouTube & YouTube Music Web Player
+
 # Why I made this
 Laziness. Kidding. I made this because after I watch a lecture video, I usually try the code myself in my IDE. Then there's just silence. It's boring. For me, I can't just have the music play while watching the lecture because it's distracting. This saves me my time and attention. 
 
